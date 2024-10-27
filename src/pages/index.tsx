@@ -5,9 +5,7 @@ import Button from '../components/Button.tsx';
 
 function Home() {
   const { test } = useTest();
-  const increment = useCounter((state: any) => state.increment);
-  const decrement = useCounter((state: any) => state.decrement);
-  const counter = useCounter((state: any) => state.counter);
+  const { increment, decrement, counter } = useCounter((state: any) => state);
   return (
     <DefaultLayout>
       <main className="mt-10 text-center">
@@ -17,9 +15,13 @@ function Home() {
         <Button onClick={() => test.setNumber(test.number + 1)}>This is the button</Button>
 
         <h3 className={'mt-10'}>This is from zustand state</h3>
-        <p>Number: {counter}</p>
-        <Button onClick={() => increment()}>increment</Button>
-        <Button onClick={() => decrement()}>decrement</Button>
+        <p data-testid="counter">Number: {counter}</p>
+        <Button data-testid="increment" onClick={() => increment()}>
+          increment
+        </Button>
+        <Button data-testid="decrement" onClick={() => decrement()}>
+          decrement
+        </Button>
       </main>
     </DefaultLayout>
   );
