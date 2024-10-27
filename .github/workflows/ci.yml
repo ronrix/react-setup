@@ -2,7 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [main, chore/ci]
+    branches: [main]
   issue_comment:
     types: [created]
 
