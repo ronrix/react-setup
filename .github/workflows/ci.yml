@@ -1,0 +1,79 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main, chore/ci]
+  issue_comment:
+    types: [created]
+
+jobs:
+  check-pr:
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/test')
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.comment-branch.outputs.head_sha }}
+    steps:
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@master
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+
+  unit-test:
+    needs: [check-pr]
+    if: github.event_name == 'push' || success()
+    runs-on: ubuntu-latest
+    outputs:
+      success: ${{ job.status == 'success' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || '' }}
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - uses: actions/cache@v4
+        name: Setup bun cache
+        with:
+          path: ~/.bun/install/cache
+          key: "${{ runner.os }}-${{ hashFiles('**/bun.lockb') }}"
+          restore-keys: |
+            ${{ runner.os }}-
+
+      - name: Install Project Dependencies
+        run: bun install
+
+      - name: Execute Unit tests
+        run: bun run test
+
+  update-pr-status:
+    needs: [unit-test]
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine combined status
+        run: |
+          if ${{ needs.e2e-test.outputs.success }} && ${{ needs.unit-test.outputs.success }}; then
+            echo "Overall status is success."
+            echo "COMBINED_STATUS=success" >> $GITHUB_ENV
+          else
+            echo "Overall status is failure."
+            echo "COMBINED_STATUS=failure" >> $GITHUB_ENV
+          fi
+
+      - name: Set latest commit status as ${{ env.COMBINED_STATUS }}
+        uses: myrotvorets/set-commit-status-action@master
+        if: always()
+        with:
+          sha: ${{ needs.check-pr.outputs.commit }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ env.COMBINED_STATUS }}
